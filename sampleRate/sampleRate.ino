@@ -20,7 +20,7 @@
 
 Adafruit_BNO055 orientationSensor = Adafruit_BNO055();  //create a orienation sensor object
 
-int C2 = 65;
+int C2 = 1500;
 int C3 = 131;
 int buzzerPin = 9;
 //Volume vol;
@@ -39,11 +39,8 @@ float lastZ;
 float velocityX;
 float velocityY;
 float velocityZ;
-float reverseVelocityX;
-float totalVelocity;
-long velocity[] = {0, 0, 0, 0};
-float velocity_avg;
-
+float averageVelocity = 0;
+float lastVelocity;
 
 
 void setup()
@@ -76,16 +73,7 @@ void loop()
     xOrientation = event.orientation.x;
     yOrientation = event.orientation.y;
     zOrientation = event.orientation.z;
-
-    //print the data
-    //  Serial.print("X: ");
-    //  Serial.print(xOrientation);
-    //  Serial.print("  Y:  ");
-    //  Serial.print(yOrientation);
-    //  Serial.print("  Z:  ");
-    //  Serial.println(zOrientation);
-
-
+ 
     // set the orientation to a positive number for the purpose of math;
     if (xOrientation < 0) {
       xOrientation = abs(xOrientation);
@@ -115,43 +103,17 @@ void loop()
       velocityZ = abs(velocityZ);
     }
 
+   averageVelocity = ((velocityX + velocityY + velocityZ) / 3);
+                      Serial.println(averageVelocity);
 
-    //   velocity[3]=velocity[2];
-    //   velocity[2]=velocity[1];
-    //   velocity[1]=velocity[0];
-    //   velocity[0]=velocityX;
-    //   velocity_avg=1.0/4.0*(velocity[0]+velocity[1]+velocity[2]+velocity[3]);
-    //   Serial.println(velocity_avg);
-
-    /*
-       // see what the highest number is, and set that as the tone for the pitch
-       int velocityArray[] = {velocityX, velocityY, velocityZ};
-       float highestVelocity = 0;
-       for (int i = 0; i < 3; i++) {
-         if (velocityArray[i] > highestVelocity) {
-           highestVelocity = velocityArray[i];
-         }
-
-       }
-
-       Serial.println(highestVelocity);
-       highestVelocity = abs((50-highestVelocity));
-       Serial.println(highestVelocity);
-       if (highestVelocity <= 50)  {
-         int thisPitch = map(highestVelocity, 0, 50, 0, 1500);
-         tone(buzzerPin, thisPitch, 100);
-       } else {
-         tone(buzzerPin, 0, 100);
-       }
-
-    */
-
-    //if the velocity is less than 2 in any combination, it means the object is still and it should be very loud.
-    if ((velocityZ && velocityX < 2) || (velocityZ && velocityY < 2 ) || (velocityZ && velocityY < 2 ) ) {
-      tone(buzzerPin, C2, 250);
+    Serial.println(averageVelocity);
+    if (averageVelocity < lastVelocity) {
+      averageVelocity = abs((10-averageVelocity));
+      int thisPitch = map(averageVelocity, 2, 9, 0, 1500);
+      tone(buzzerPin, thisPitch, 150);
+    } else {
+      tone(buzzerPin, 0, 100);
     }
-
-
 
     Serial.print(" vX ");
     Serial.print(velocityX);
@@ -162,6 +124,7 @@ void loop()
     Serial.println('v: ');
 
     lastRead = millis();
+    lastVelocity = averageVelocity;
     lastX = xOrientation;
     lastY = yOrientation;
     lastZ = zOrientation;
