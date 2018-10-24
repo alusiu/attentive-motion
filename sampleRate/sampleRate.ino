@@ -23,7 +23,6 @@ Adafruit_BNO055 orientationSensor = Adafruit_BNO055();  //create a orienation se
 int C2 = 1500;
 int C3 = 131;
 int buzzerPin = 9;
-//Volume vol;
 
 unsigned long lastRead;   //used for the sampleRate timer
 int sampleRate = 100;     //the sampleRate for reading the sensor.  Without this it will crash.
@@ -41,6 +40,8 @@ float velocityY;
 float velocityZ;
 float averageVelocity = 0;
 float lastVelocity;
+float reverseVelocity;
+int thisPitch = 1500;
 
 
 void setup()
@@ -73,7 +74,7 @@ void loop()
     xOrientation = event.orientation.x;
     yOrientation = event.orientation.y;
     zOrientation = event.orientation.z;
- 
+
     // set the orientation to a positive number for the purpose of math;
     if (xOrientation < 0) {
       xOrientation = abs(xOrientation);
@@ -103,25 +104,41 @@ void loop()
       velocityZ = abs(velocityZ);
     }
 
-   averageVelocity = ((velocityX + velocityY + velocityZ) / 3);
-                      Serial.println(averageVelocity);
+    averageVelocity = ((velocityX + velocityY + velocityZ) / 3);
+    Serial.print("average: ");
+    Serial.print(averageVelocity);
+    Serial.print(" last: ");
+    Serial.print(lastVelocity);
+    Serial.print(" last - average: ");
+    Serial.print(lastVelocity - averageVelocity);
+    Serial.print(" average - last: ");
+    Serial.println(averageVelocity - lastVelocity);
+    // if the last velocity is slower than the velocity before, make a louder noise
 
-    Serial.println(averageVelocity);
-    if (averageVelocity < lastVelocity) {
-      averageVelocity = abs((10-averageVelocity));
-      int thisPitch = map(averageVelocity, 2, 9, 0, 1500);
+    if ((averageVelocity < lastVelocity) || (averageVelocity == lastVelocity)) {
+      if (0.75 > (lastVelocity - averageVelocity) < 7) {
+        // if the difference is less than two change the pitch;
+        reverseVelocity = abs((7 - averageVelocity));
+        thisPitch = map(reverseVelocity, 0, 7, 0, 1500);
+        tone(buzzerPin, thisPitch, 150);
+      }
+      // if it is less then 0.75 then it is still and blare a full loud tone'
+    } else if (0 > (averageVelocity - lastVelocity) < 0.75)  {
       tone(buzzerPin, thisPitch, 150);
+
     } else {
-      tone(buzzerPin, 0, 100);
+      thisPitch = 0;
+      noTone(buzzerPin);
     }
 
-    Serial.print(" vX ");
-    Serial.print(velocityX);
-    Serial.print(" vY ");
-    Serial.print(velocityY);
-    Serial.print(" vZ ");
-    Serial.print(velocityZ);
-    Serial.println('v: ');
+
+    /* Serial.print(" vX ");
+      Serial.print(velocityX);
+      Serial.print(" vY ");
+      Serial.print(velocityY);
+      Serial.print(" vZ ");
+      Serial.print(velocityZ);
+      Serial.println('v: ');*/
 
     lastRead = millis();
     lastVelocity = averageVelocity;
