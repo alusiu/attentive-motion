@@ -1,3 +1,4 @@
+
 /*
    Creation & Computation - Digital Futures, OCAD University
    Kate Hartman / Nick Puckett
@@ -17,15 +18,23 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
+#include <Adafruit_NeoPixel.h>
 
 Adafruit_BNO055 orientationSensor = Adafruit_BNO055();  //create a orienation sensor object
 
 int C2 = 1500;
 int C3 = 131;
 int buzzerPin = 9;
+int motorPin = 4;
+int pixelPin = 6;
 
-unsigned long lastRead;   //used for the sampleRate timer
-int sampleRate = 100;     //the sampleRate for reading the sensor.  Without this it will crash.
+int r;
+int g;
+int b;
+
+unsigned long lastRead;
+unsigned long lastBlinked; //used for the sampleRate timer
+int sampleRate = 75;     //the sampleRate for reading the sensor.  Without this it will crash.
 
 
 float xOrientation;     //holds the X orientation    Degrees
@@ -42,6 +51,10 @@ float averageVelocity = 0;
 float lastVelocity;
 float reverseVelocity;
 int thisPitch = 1500;
+int thisMotorSpeed = 255;
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(20, pixelPin, NEO_GRB + NEO_KHZ800);
+
 
 
 void setup()
@@ -57,15 +70,41 @@ void setup()
   }
 
   delay(1000);  ///wait for one second for everything to start up.
-  //  vol.begin();
+
+  strip.begin();
+  strip.show();
   orientationSensor.setExtCrystalUse(true);
 }
 
 void loop()
 {
+  //theaterChase(, 50);
+
 
   if (millis() - lastRead >= sampleRate)
   {
+
+
+    for (int j = 0; j < 1; j++) { //do 10 cycles of chasing
+      //for (int q = 0; q < 3; q++) {
+      int q = 0;
+      while (q < 3) {
+        for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
+          strip.setPixelColor(i + q, strip.Color(r, g , b)); //turn every third pixel on
+        }
+        if (millis() - lastBlinked >= 10)
+        {
+          strip.show();
+          for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
+            strip.setPixelColor(i + q, 0);      //turn every third pixel off
+          }
+          q ++;
+          lastBlinked = millis();
+        }
+      }
+
+    }
+
 
     sensors_event_t event; //create an event variable
     orientationSensor.getEvent(&event); //pass it to the BNO055 object
@@ -105,6 +144,7 @@ void loop()
     }
 
     averageVelocity = ((velocityX + velocityY + velocityZ) / 3);
+
     Serial.print("average: ");
     Serial.print(averageVelocity);
     Serial.print(" last: ");
@@ -113,32 +153,38 @@ void loop()
     Serial.print(lastVelocity - averageVelocity);
     Serial.print(" average - last: ");
     Serial.println(averageVelocity - lastVelocity);
-    // if the last velocity is slower than the velocity before, make a louder noise
 
+    // if the last velocity is slower than the velocity before, make a louder noise
     if ((averageVelocity < lastVelocity) || (averageVelocity == lastVelocity)) {
       if (0.75 > (lastVelocity - averageVelocity) < 7) {
         // if the difference is less than two change the pitch;
         reverseVelocity = abs((7 - averageVelocity));
-        thisPitch = map(reverseVelocity, 0, 7, 0, 1500);
-        tone(buzzerPin, thisPitch, 150);
+
+        thisPitch = map(reverseVelocity, 0.75, 7, 0, 1500);
+        thisMotorSpeed = map(reverseVelocity, 0.75, 7, 0, 150);
+
+        r = 255;
+        b = 0;
+        g = 0;
+
+        tone(buzzerPin, thisPitch, 100);
+        analogWrite(motorPin, thisMotorSpeed);
       }
       // if it is less then 0.75 then it is still and blare a full loud tone'
     } else if (0 > (averageVelocity - lastVelocity) < 0.75)  {
-      tone(buzzerPin, thisPitch, 150);
+      r = map(velocityX, 0, 255, 0, 255);
+      g = map(velocityY, 0, 255, 0, 255);
+      b = map(velocityZ, 0, 255, 0, 255);
+      tone(buzzerPin, thisPitch, 100);
+      analogWrite(motorPin, thisMotorSpeed);
 
     } else {
+
       thisPitch = 0;
       noTone(buzzerPin);
+
+      analogWrite(motorPin, 0);
     }
-
-
-    /* Serial.print(" vX ");
-      Serial.print(velocityX);
-      Serial.print(" vY ");
-      Serial.print(velocityY);
-      Serial.print(" vZ ");
-      Serial.print(velocityZ);
-      Serial.println('v: ');*/
 
     lastRead = millis();
     lastVelocity = averageVelocity;
