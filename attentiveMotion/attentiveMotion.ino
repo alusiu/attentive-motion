@@ -28,32 +28,33 @@ int buzzerPin = 9;
 int motorPin = 4;
 int pixelPin = 6;
 
-int r;
-int g;
-int b;
+//establish the LED colours
+int r = 255;
+int g = 0;
+int b = 0;
 
 unsigned long lastRead;
-unsigned long lastBlinked; //used for the sampleRate timer
-int sampleRate = 75;     //the sampleRate for reading the sensor.  Without this it will crash.
+//used for the sampleRate timer
+int sampleRate = 100;     //the sampleRate for reading the sensor.  Without this it will crash.
+boolean lightsOn = true; // used to determine whether or not the lights should blink;
 
 
 float xOrientation;     //holds the X orientation    Degrees
 float yOrientation;     //holds the Y orientation    Degrees
 float zOrientation;      //holds the Z orientation   Degrees
 
-float lastX;
-float lastY;
-float lastZ;
-float velocityX;
-float velocityY;
-float velocityZ;
-float averageVelocity = 0;
-float lastVelocity;
-float reverseVelocity;
+float lastX; // holds the last X orientation sample
+float lastY; // holds the last Y orientation sample
+float lastZ; // holds the last Z orientation sample
+float velocityX; // holds the last velocity of X orientation sample
+float velocityY; // holds the last velocity of Y orientation sample
+float velocityZ; // holds the last velocity of Z orientation sample
+float averageVelocity = 0;  // the average of velocity x, y, z,
+float lastVelocity; // the average of the previous last velocity x, y, z
+float reverseVelocity; // reverse the velocity so that low movement means high pitch
 int thisPitch = 1500;
-int thisMotorSpeed = 255;
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(20, pixelPin, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(18, pixelPin, NEO_GRB + NEO_KHZ800);
 
 
 
@@ -78,33 +79,24 @@ void setup()
 
 void loop()
 {
-  //theaterChase(, 50);
-
-
   if (millis() - lastRead >= sampleRate)
   {
-
-
-    for (int j = 0; j < 1; j++) { //do 10 cycles of chasing
-      //for (int q = 0; q < 3; q++) {
-      int q = 0;
-      while (q < 3) {
-        for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
-          strip.setPixelColor(i + q, strip.Color(r, g , b)); //turn every third pixel on
-        }
-        if (millis() - lastBlinked >= 10)
-        {
-          strip.show();
-          for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
-            strip.setPixelColor(i + q, 0);      //turn every third pixel off
-          }
-          q ++;
-          lastBlinked = millis();
-        }
+    // set the strip golcor
+    if (lightsOn) {
+      for (uint16_t i = 0; i < strip.numPixels(); i = i + 2) {
+        strip.setPixelColor(i + 1, strip.Color(r, g , b)); //turn every third pixel on
+        strip.setPixelColor(i - 2, strip.Color(0, 0, 0));
+        strip.show();
       }
-
+      lightsOn = !lightsOn;
+    } else {
+      for (uint16_t i = 0; i < strip.numPixels(); i = i + 2) {
+        strip.setPixelColor(i + 1, strip.Color(0, 0, 0)); //turn every third pixel on
+        strip.setPixelColor(i - 2, strip.Color(r, g , b));
+        strip.show();
+      }
+      lightsOn = !lightsOn;
     }
-
 
     sensors_event_t event; //create an event variable
     orientationSensor.getEvent(&event); //pass it to the BNO055 object
@@ -156,41 +148,44 @@ void loop()
 
     // if the last velocity is slower than the velocity before, make a louder noise
     if ((averageVelocity < lastVelocity) || (averageVelocity == lastVelocity)) {
-      if (0.75 > (lastVelocity - averageVelocity) < 7) {
+      // if the difference between lastVelocity and averageVelocity is within a "slowing" range,
+      if (0.75 > (lastVelocity - averageVelocity) < 5) {
         // if the difference is less than two change the pitch;
+
         reverseVelocity = abs((7 - averageVelocity));
-
         thisPitch = map(reverseVelocity, 0.75, 7, 0, 1500);
-        thisMotorSpeed = map(reverseVelocity, 0.75, 7, 0, 150);
 
-        r = 255;
-        b = 0;
-        g = 0;
+        r = r + 50; // increase the colour slowly to red;
 
         tone(buzzerPin, thisPitch, 100);
-        analogWrite(motorPin, thisMotorSpeed);
+
       }
-      // if it is less then 0.75 then it is still and blare a full loud tone'
+
+      // if it is less then 0.75 then it is still and blare a full loud tone
     } else if (0 > (averageVelocity - lastVelocity) < 0.75)  {
+
+      // correlate the velocity of each orientation to either R, G, B to randomly regenerate colours
       r = map(velocityX, 0, 255, 0, 255);
       g = map(velocityY, 0, 255, 0, 255);
       b = map(velocityZ, 0, 255, 0, 255);
       tone(buzzerPin, thisPitch, 100);
-      analogWrite(motorPin, thisMotorSpeed);
 
     } else {
 
+      // if it's going fast make the LED lights white;
+      r = 255;
+      g = 255;
+      b = 255;
+
+      // set pitch to 0
       thisPitch = 0;
       noTone(buzzerPin);
-
-      analogWrite(motorPin, 0);
     }
-
+    // store and reset the variables for the next loop;
     lastRead = millis();
     lastVelocity = averageVelocity;
     lastX = xOrientation;
     lastY = yOrientation;
     lastZ = zOrientation;
-    //save the value of the current time so the timer works
   }
 }
